@@ -2,6 +2,7 @@ import express from "express";
 
 import { auth } from "./auth";
 import { initializeIdleServers, initializeOnStartup } from "./lib/startup";
+import managementMcpRouter from "./routers/management-mcp";
 import mcpProxyRouter from "./routers/mcp-proxy";
 import oauthRouter from "./routers/oauth";
 import publicEndpointsRouter from "./routers/public-metamcp";
@@ -12,8 +13,8 @@ const app = express();
 
 // Global JSON middleware for non-proxy routes
 app.use((req, res, next) => {
-  if (req.path.startsWith("/mcp-proxy/") || req.path.startsWith("/metamcp/")) {
-    // Skip JSON parsing for all MCP proxy routes and public endpoints to allow raw stream access
+  if (req.path.startsWith("/mcp-proxy/") || req.path.startsWith("/metamcp/") || req.path.startsWith("/management/")) {
+    // Skip JSON parsing for all MCP proxy routes, public endpoints, and management MCP to allow raw stream access
     next();
   } else {
     express.json({ limit: "50mb" })(req, res, next);
@@ -83,6 +84,9 @@ app.use("/mcp-proxy", mcpProxyRouter);
 // Mount tRPC routes
 app.use("/trpc", trpcRouter);
 
+// Mount Management MCP (admin API as MCP server)
+app.use("/management", managementMcpRouter);
+
 async function start(): Promise<void> {
   // Startup initialization (must run after DB is reachable/migrations are applied, and before listening)
   await initializeOnStartup();
@@ -97,6 +101,9 @@ async function start(): Promise<void> {
       `MCP Proxy routes available at: http://localhost:12009/mcp-proxy`,
     );
     console.log(`tRPC routes available at: http://localhost:12009/trpc`);
+    console.log(
+      `Management MCP available at: http://localhost:12009/management/mcp`,
+    );
 
     // Wait a moment for the server to be fully ready to handle incoming connections,
     // then initialize idle servers (prevents connection errors when MCP servers connect back)
